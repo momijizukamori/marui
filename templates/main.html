@@ -38,7 +38,7 @@
     <section>
       <h2 id="directory">Directory</h2>
       <ul>
-      {% for site in directory %}
+      {% for site in sites %}
           <li><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</li>
       {% endfor %}
       </ul>

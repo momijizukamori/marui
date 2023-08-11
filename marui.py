@@ -18,6 +18,7 @@ except:
 
 csrf = CSRFProtect(app)
 SITES = {}
+DEBUG = app.config.get('DEBUG', False)
 
 
 try:
@@ -31,7 +32,12 @@ def read_file(filename):
 
 def write_file(filename, data):
     with open(os.path.join('data', filename), 'w') as file:
-        return json.dump(file, data)
+        return json.dump(data, file)
+
+def add_to_file(filename, data):
+    datalist = read_file(filename)
+    datalist['sites'].append(data)
+    write_file(filename, datalist)
 
 class SiteForm(FlaskForm):
     site_url = StringField('Site URL', validators=[DataRequired()])
@@ -49,7 +55,7 @@ def index():
     if form.validate_on_submit():
         # very basic anti-spam check
         if form.agreement.data == "Y":
-            handle_webhook(form)
+            handle_form(form)
     return render_template('main.html', sites=SITES, form=form)
 
 @app.route('/json')
@@ -58,35 +64,48 @@ def sites():
     if form.validate_on_submit():
         # very basic anti-spam check
         if form.agreement.data == "Y":
-            handle_webhook(form)
+            handle_form(form)
 
     return render_template('main.html', sites=SITES, form=form)
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if session.get('logged_in', False):
+    if session.get('logged_in', False) and not DEBUG:
         return redirect(url_for('login'))
     pending = read_file('pending.json')
     remove = read_file('remove.json')
     if request.method == 'POST':
+        print(request.form)
         if request.form.get('remove', False):
             ids = get_ids(request.form, 'remove-')
-        if request.form.get('approve'):
+        if request.form.get('approve', False):
             ids = get_ids(request.form, 'add-')
-
-        pass
     return render_template('admin.html', sites=SITES, pending=pending, remove=remove)
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
-    if not session.get('logged_in', False):
+    if session.get('logged_in', False) or DEBUG:
         return redirect(url_for('admin'))
     if request.method == 'POST':
         if check_password_hash(pw_hash['password'], form.password.data):
             return redirect(url_for('admin'))
     return render_template('login.html', form=form)
+
+def handle_form(form):
+    data = {
+        'url' : form.site_url.data,
+        'name': form.site_name.data,
+        'desc': form.site_desc.data
+    }
+
+    site_urls = [site['url'] for site in SITES]
+    if form.removal.data:
+        if data['url'] in site_urls:
+            add_to_file('remove.json', data)
+    else:
+        add_to_file('pending.json', data)
 
 def handle_webhook(form):
     pass
