@@ -1,53 +1,26 @@
 import json
 import secrets
-import os
 import click
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
-from wtforms import StringField, TextAreaField, PasswordField, SelectField, BooleanField
-from wtforms.validators import DataRequired
+
+from utils import SiteData, SiteForm, LoginForm, read_file, write_file
+
+CONFIG_PATH = 'config.json'
+DATA_PATH = 'sites.json'
 
 app = Flask(__name__)
 app.secret_key = b"asdljsdlafjkwef123"
 try:
-    app.config.from_file(read_file('config.json'), load=json.load)
+    app.config.from_file(read_file(CONFIG_PATH), load=json.load)
 except:
     print("Couldn't load config from file!")
 
+
 csrf = CSRFProtect(app)
-SITES = {}
+DATA = SiteData(DATA_PATH)
 DEBUG = app.config.get('DEBUG', False)
-
-
-try:
-    SITES = read_file('sites.json')
-except:
-    print("Couldn't load sites from file!")
-
-def read_file(filename):
-    with open(os.path.join('data', filename), 'r') as file:
-        return json.load(file)
-
-def write_file(filename, data):
-    with open(os.path.join('data', filename), 'w') as file:
-        return json.dump(data, file)
-
-def add_to_file(filename, data):
-    datalist = read_file(filename)
-    datalist['sites'].append(data)
-    write_file(filename, datalist)
-
-class SiteForm(FlaskForm):
-    site_url = StringField('Site URL', validators=[DataRequired()])
-    site_name = StringField('Site Name')
-    site_desc = TextAreaField('Site Description')
-    agreement = SelectField('Do you agree to the rules?', choices=[("-", "-"), ("N", "No"), ("Y", "Yes")])
-    removal = BooleanField('Remove site')
-
-class LoginForm(FlaskForm):
-    password = PasswordField('password')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -55,32 +28,33 @@ def index():
     if form.validate_on_submit():
         # very basic anti-spam check
         if form.agreement.data == "Y":
-            handle_form(form)
-    return render_template('main.html', sites=SITES, form=form)
+            DATA.handle_form(form)
+    return render_template('main.html', sites=DATA.sites, form=form)
 
-@app.route('/json')
+@app.route('/sites')
 def sites():
-    form = SiteForm()
-    if form.validate_on_submit():
-        # very basic anti-spam check
-        if form.agreement.data == "Y":
-            handle_form(form)
-
-    return render_template('main.html', sites=SITES, form=form)
+    return DATA.data()
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if session.get('logged_in', False) and not DEBUG:
         return redirect(url_for('login'))
-    pending = read_file('pending.json')
-    remove = read_file('remove.json')
+    
     if request.method == 'POST':
-        print(request.form)
+        clear = request.form.get('clear', False)
+        ids = [int(request.form[key]) for key in request.form.keys() if 'check-' in key]
+
+        if clear:
+            DATA.remove_from_list(ids, clear)
+
         if request.form.get('remove', False):
-            ids = get_ids(request.form, 'remove-')
+            DATA.handle_removals(ids)
+
         if request.form.get('approve', False):
-            ids = get_ids(request.form, 'add-')
-    return render_template('admin.html', sites=SITES, pending=pending, remove=remove)
+            DATA.handle_additions(ids)
+      
+        DATA.sort_and_save()
+    return render_template('admin.html', data=DATA)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -92,26 +66,6 @@ def login():
         if check_password_hash(pw_hash['password'], form.password.data):
             return redirect(url_for('admin'))
     return render_template('login.html', form=form)
-
-def handle_form(form):
-    data = {
-        'url' : form.site_url.data,
-        'name': form.site_name.data,
-        'desc': form.site_desc.data
-    }
-
-    site_urls = [site['url'] for site in SITES]
-    if form.removal.data:
-        if data['url'] in site_urls:
-            add_to_file('remove.json', data)
-    else:
-        add_to_file('pending.json', data)
-
-def handle_webhook(form):
-    pass
-
-def get_ids(form, keyword):
-    return [key for key in form.keys() if keyword in key]
 
 @app.cli.command("update-password")
 @click.password_option()
@@ -128,7 +82,7 @@ def update_password(password):
 @click.option('--webhook-url', prompt=True)
 def setup_config(password, site_url, site_name, webhook_service, webhook_url):
     app.config.password = generate_password_hash(password)
-    app.config.webhook_service = lower(webhook_service)
+    app.config.webhook_service = webhook_service.lower()
     app.config.webhook_url = webhook_url
     app.config.site_url = site_url
     app.config.site_name = site_name

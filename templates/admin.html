@@ -3,27 +3,27 @@
 <h2>Pending</h2>
 <form method="POST" action="/admin">
 	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-	{% for site in pending['sites'] %}
-		<li><input type="checkbox" id="add-{{loop.index0}}" name="add-{{loop.index0}}" value=1><label for="add-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
+	{% for site in data.pending %}
+		<li><input type="checkbox" id="add-{{loop.index0}}" name="check-{{loop.index0}}" value={{loop.index0}}><label for="add-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
 	{% endfor %}
-	<input type="submit" name="approve" value="Approve"><input type="submit" name="clear-pending"value="Clear">
+	<input type="submit" name="approve" value="Approve"><button type="submit" name="clear" value="pending">Clear</button>
 </form>
 
 <h2>Remove</h2>
 <form method="POST" action="/admin">
 	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-	{% for site in remove['sites'] %}
-		<li><input type="checkbox" id="remove-{{loop.index0}}" name="remove-{{loop.index0}}" value=1><label for="remove-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
+	{% for site in data.remove %}
+		<li><input type="checkbox" id="remove-{{loop.index0}}" name="check-{{loop.index0}}" value={{loop.index0}}><label for="remove-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
 	{% endfor %}
-	<input type="submit" name="remove" value="Remove"><input type="submit" name="clear-remove" value="Clear">
+	<input type="submit" name="remove" value="Remove"><button type="submit" name="clear" value="remove">Clear</button>
 </form>
 
 <h2>Sites</h2>
 <form method="POST" action="/admin">
 	<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-	{% for site in sites['sites'] %}
-		<li><input type="checkbox" id="sites-{{loop.index0}}" name="sites-{{loop.index0}}" value=1><label for="sites-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
+	{% for site in data.sites %}
+		<li><input type="checkbox" id="sites-{{loop.index0}}" name="check-{{loop.index0}}" value={{loop.index0}}><label for="sites-{{loop.index0}}"><a href="{{ site.href }}">{{ site.name }}</a> - {{site.desc}}</label></li>
 	{% endfor %}
-	<input type="submit" name="remove-sites" value="Remove">
+	<button type="submit" name="clear" value="sites">Remove</button>
 </form>
 {% endblock %}
